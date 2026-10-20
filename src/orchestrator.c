@@ -34,7 +34,7 @@ int dispatch(Agency *a, int argc, char **argv) {
     const char *cmd = argv[0];
     if (!strcmp(cmd, "exit") && argc == 1) return 1;
     if (!strcmp(cmd, "help") && argc == 1) {
-        puts("submit <task_file> | tasks | collect <task_id> | run <program> [args...] | list | status/wait/report/log <task_id> | exit | help");
+        puts("send <from> <to> <task_id> <message> | submit <task_file> | tasks | collect <task_id> | run <program> [args...] | list | status/wait/report/log <task_id> | exit | help");
     } else if (!strcmp(cmd, "run") && argc >= 2) {
         if (a->count == MAX_TASKS) { fputs("Task table full\n", stderr); return 0; }
         Task *t = &a->tasks[a->count];
@@ -42,6 +42,17 @@ int dispatch(Agency *a, int argc, char **argv) {
         if (next_task_id(t->id, sizeof(t->id)) || !single_line(argv[1]) || copy_field(t->agent, sizeof(t->agent), argv[1])) { perror("run validation"); return 0; }
         ++a->count;
         launch(a, t, argv + 1);
+    } else if (!strcmp(cmd, "send") && argc >= 5) {
+        char message[FIELD] = "";
+        size_t used = 0;
+        for (int i = 4; i < argc; ++i) {
+            size_t len = strlen(argv[i]);
+            if (used + len + (i > 4 ? 1 : 0) >= sizeof(message)) { fputs("Message too long\n", stderr); return 0; }
+            if (i > 4) message[used++] = ' ';
+            memcpy(message + used, argv[i], len + 1);
+            used += len;
+        }
+        send_message(a, argv[1], argv[2], argv[3], message);
     } else if (!strcmp(cmd, "submit") && argc == 2) {
         submit_task(a, argv[1]);
     } else if (!strcmp(cmd, "tasks") && argc == 1) {

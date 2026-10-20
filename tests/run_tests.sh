@@ -139,3 +139,33 @@ grep -q 'status: failure' reports/task_042.report
 test ! -f reports/task_040.briefing
 echo 'PASS P3: analyst CSV/output/report, malformed data done:2, reporter missing-message contract'
 cd "$root"
+cd "$tmp"
+# Replace the P3 reporter copy with the built messaging agent (same build).
+printf 'send analyst reporter task_040 "please brief"\nexit\n' | ./agency > send-output 2>&1
+test -f messages/msg_001.analyst.reporter.txt
+grep -q 'message: please brief' messages/msg_001.analyst.reporter.txt
+cat > tasks/task_043.task <<'TASK'
+id: task_043
+agent: reporter
+input: data/report_request.txt
+output: reports/task_040.briefing
+TASK
+printf 'submit tasks/task_043.task\ncollect task_043\nexit\n' | ./agency > brief-output 2>&1
+grep -q 'exit_code: 0' status/task_043.status
+grep -q 'source_task: task_040' reports/task_043.report
+grep -q 'source_message: msg_001.analyst.reporter.txt' reports/task_043.report
+grep -q 'average: 80.00' reports/task_040.briefing
+set +e
+agents/reporter task_044 data/report_request.txt reports/second.briefing > repeat-output 2>&1
+code=$?
+set -e
+test "$code" = 1
+test ! -f reports/second.briefing
+printf 'send analyst reporter task_040 "second message"\nexit\n' | ./agency > send-restart-output 2>&1
+test -f messages/msg_002.analyst.reporter.txt
+printf 'send scout reporter task_040 "invalid source"\nsend analyst unknown task_040 hello\nexit\n' | ./agency > invalid-send-output 2>&1
+grep -q 'source task/agent mismatch' invalid-send-output
+grep -q 'Unknown recipient agent' invalid-send-output
+test "$(find messages -name '*.txt' | wc -l | tr -d ' ')" = 2
+echo 'PASS P4: atomic numbered messages/restart, reporter briefing and durable consumption, send validation'
+cd "$root"

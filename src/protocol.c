@@ -1,6 +1,7 @@
 #include "protocol.h"
 #include <ctype.h>
 #include <errno.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -109,4 +110,20 @@ int print_file(const char *path) {
     if (ferror(fp)) bad = 1;
     if (fclose(fp)) bad = 1;
     return bad ? -1 : 0;
+}
+
+int message_number(const char *name, unsigned long *number) {
+    size_t len = strlen(name);
+    if (strncmp(name, "msg_", 4) || len < 12 || strcmp(name + len - 4, ".txt")) return -1;
+    const char *start = name + 4;
+    const char *dot = strchr(start, '.');
+    if (!dot || dot - start < 3) return -1;
+    for (const char *p = start; p < dot; ++p) if (!isdigit((unsigned char)*p)) return -1;
+    errno = 0;
+    char *end;
+    unsigned long n = strtoul(start, &end, 10);
+    if (errno == ERANGE || n == ULONG_MAX) return -2;
+    if (end != dot) return -1;
+    *number = n;
+    return 0;
 }

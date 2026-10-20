@@ -150,3 +150,34 @@ void show_tasks(Agency *a) {
     }
     closedir(dir);
 }
+
+void send_message(Agency *a, const char *from, const char *to, const char *id, const char *message) {
+    if (!valid_name(from) || !valid_name(to) || !valid_id(id) || !*message || strlen(message) >= FIELD || !single_line(message)) {
+        fprintf(stderr, "Invalid message fields\n"); return;
+    }
+    Task *source = find_task(a, id);
+    Task pending;
+    char path[FIELD];
+    if (!source && !task_path(path, sizeof(path), "tasks", id, "task") && !read_task(path, &pending)) source = &pending;
+    if (!source || strcmp(from, source->agent)) { fprintf(stderr, "Message source task/agent mismatch\n"); return; }
+    int n = snprintf(path, sizeof(path), "./agents/%s", to);
+    if (n < 0 || (size_t)n >= sizeof(path) || access(path, X_OK)) { fprintf(stderr, "Unknown recipient agent: %s\n", to); return; }
+    DIR *dir = opendir("messages");
+    if (!dir) { perror("messages"); return; }
+    unsigned long max = 0;
+    struct dirent *e;
+    while ((e = readdir(dir))) {
+        unsigned long seq;
+        int rc = message_number(e->d_name, &seq);
+        if (rc == -2) { closedir(dir); fprintf(stderr, "Message sequence exhausted\n"); return; }
+        if (!rc && seq > max) max = seq;
+    }
+    if (closedir(dir)) { perror("messages close"); return; }
+    n = snprintf(path, sizeof(path), "messages/msg_%03lu.%s.%s.txt", max + 1, from, to);
+    if (n < 0 || (size_t)n >= sizeof(path)) { fprintf(stderr, "Message filename too long\n"); return; }
+    FILE *fp = atomic_begin(path);
+    if (!fp) { perror("message publish"); return; }
+    fprintf(fp, "from: %s\nto: %s\ntask: %s\nmessage: %s\n", from, to, id, message);
+    if (atomic_finish(fp, path)) perror("message publish");
+    else printf("Message sent: %s\n", path);
+}

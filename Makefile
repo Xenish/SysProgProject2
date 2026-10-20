@@ -2,6 +2,7 @@ CC = cc
 CPPFLAGS = -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude
 CFLAGS = -std=c11 -Wall -Wextra -Werror -O2 -g
 .PHONY: all test clean
+.SECONDARY:
 SOURCES = src/main.c src/cli.c src/orchestrator.c src/process.c src/workspace.c src/protocol.c src/mailbox.c
 OBJECTS = $(SOURCES:%.c=build/%.o)
 AGENTS = analyst reporter

@@ -15,5 +15,6 @@ FILE *atomic_begin(const char *path);
 int atomic_finish(FILE *fp, const char *path);
 void atomic_abort(FILE *fp, const char *path);
 int atomic_text(const char *path, const char *text);
+int message_number(const char *name, unsigned long *number);
 int print_file(const char *path);
 #endif
