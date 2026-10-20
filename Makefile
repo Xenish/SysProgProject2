@@ -4,7 +4,12 @@ CFLAGS = -std=c11 -Wall -Wextra -Werror -O2 -g
 .PHONY: all test clean
 SOURCES = src/main.c src/cli.c src/orchestrator.c src/process.c src/workspace.c src/protocol.c src/mailbox.c
 OBJECTS = $(SOURCES:%.c=build/%.o)
-all: agency
+AGENTS = analyst reporter
+AGENT_COMMON = build/agents/agent_common.o build/src/protocol.o
+all: agency $(AGENTS:%=agents/%)
+agents/%: build/agents/%.o $(AGENT_COMMON)
+	$(CC) $(CFLAGS) $^ -o $@
+-include $(AGENT_COMMON:.o=.d) $(AGENTS:%=build/agents/%.d)
 agency: $(OBJECTS)
 	$(CC) $(CFLAGS) $^ -o $@
 build/%.o: %.c

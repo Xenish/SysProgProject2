@@ -110,3 +110,32 @@ grep -q 'state: error' status/task_030.status
 grep -q 'exit status unavailable after restart' recovery-output
 echo 'PASS P2: submit argv/default output, duplicate/preflight, canonical task, persistent IDs/recovery'
 cd "$root"
+cd "$tmp"
+cp "$root/agents/analyst" "$root/agents/reporter" agents/
+cp "$root/data/survey.csv" data/
+cp "$root/data/report_request.txt" data/
+sed 's/task_001/task_040/g' "$root/tasks/task_001.task" > tasks/task_040.task
+printf 'submit tasks/task_040.task\ncollect task_040\nexit\n' | ./agency > analyst-output 2>&1
+grep -q 'state: done' status/task_040.status
+grep -q 'exit_code: 0' status/task_040.status
+grep -q 'collected: yes' status/task_040.status
+grep -q 'rows_processed: 4' reports/task_040.report
+grep -q 'sum: 320' reports/task_040.report
+grep -q 'average: 80.00' reports/task_040.report
+test -s data/task_040.out
+printf 'id,score\n1,oops\n' > data/bad.csv
+sed 's/task_040/task_041/g; s@data/survey.csv@data/bad.csv@' tasks/task_040.task > tasks/task_041.task
+printf 'submit tasks/task_041.task\ncollect task_041\nexit\n' | ./agency > bad-csv-output 2>&1
+grep -q 'state: done' status/task_041.status
+grep -q 'exit_code: 2' status/task_041.status
+grep -q 'status: failure' reports/task_041.report
+test ! -f data/task_041.out
+set +e
+agents/reporter task_042 data/report_request.txt reports/task_040.briefing > reporter-output 2>&1
+code=$?
+set -e
+test "$code" = 1
+grep -q 'status: failure' reports/task_042.report
+test ! -f reports/task_040.briefing
+echo 'PASS P3: analyst CSV/output/report, malformed data done:2, reporter missing-message contract'
+cd "$root"
