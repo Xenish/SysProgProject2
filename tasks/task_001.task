@@ -1,0 +1,5 @@
+id: task_001
+agent: analyst
+input: data/survey.csv
+output: data/task_001.out
+priority: 1

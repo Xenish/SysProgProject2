@@ -1,0 +1,1 @@
+Produce a briefing from the oldest unread analyst message.
