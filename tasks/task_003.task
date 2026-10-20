@@ -1,0 +1,5 @@
+id: task_003
+agent: scout
+input: data/events.txt
+output: data/task_003.out
+priority: 1

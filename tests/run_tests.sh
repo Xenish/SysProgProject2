@@ -189,3 +189,24 @@ printf 'run /bin/sh -c "exit 2"\nwait task_003\nsuggest\nexit\n' | ./agency > fa
 grep -q 'log task_003;.*new ID' failed-suggestion
 echo 'PASS P5: advisor initial/collect/send/submit/complete/failure priorities; no automatic execution'
 cd "$root"
+
+cd "$tmp"
+cp "$root/agents/scout" agents/
+cp "$root/data/events.txt" data/
+sed 's/task_003/task_050/g' "$root/tasks/task_003.task" > tasks/task_050.task
+printf 'submit tasks/task_050.task\ncollect task_050\nexit\n' | ./agency > scout-output 2>&1
+grep -q 'exit_code: 0' status/task_050.status
+grep -q 'rows_processed: 5' reports/task_050.report
+grep -q 'matching_lines: 2' reports/task_050.report
+test "$(wc -l < data/task_050.out | tr -d ' ')" = 2
+if grep -q lowercase data/task_050.out; then exit 1; fi
+printf 'INFO clean\n' > data/clean.txt
+set +e
+agents/scout task_051 data/clean.txt data/task_051.out > scout-empty-output
+code=$?
+set -e
+test "$code" = 1
+grep -q 'matching_lines: 0' reports/task_051.report
+test ! -s data/task_051.out
+echo 'PASS P6: scout case-sensitive ERROR search, output/report and no-match exit:1'
+cd "$root"

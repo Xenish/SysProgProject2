@@ -5,7 +5,7 @@ CFLAGS = -std=c11 -Wall -Wextra -Werror -O2 -g
 .SECONDARY:
 SOURCES = src/main.c src/cli.c src/orchestrator.c src/process.c src/workspace.c src/protocol.c src/mailbox.c src/advisor.c
 OBJECTS = $(SOURCES:%.c=build/%.o)
-AGENTS = analyst reporter
+AGENTS = analyst reporter scout
 AGENT_COMMON = build/agents/agent_common.o build/src/protocol.o
 all: agency $(AGENTS:%=agents/%)
 agents/%: build/agents/%.o $(AGENT_COMMON)

@@ -1,0 +1,5 @@
+INFO agency started
+ERROR missing archive
+warning low disk
+error lowercase does not match
+ERROR retry needed
