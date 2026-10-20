@@ -1,6 +1,8 @@
 #include "process.h"
 #include "orchestrator.h"
 #include "protocol.h"
+#include "workspace.h"
+#include <time.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -106,6 +108,14 @@ void reap(Agency *a) {
     }
 }
 void wait_task(Agency *a, Task *t) {
+    while (!t->child && !strcmp(t->state, "running")) {
+        monitor_recovered(a);
+        reap(a);
+        if (!strcmp(t->state, "running")) {
+            struct timespec delay = {.tv_sec = 0, .tv_nsec = 100000000};
+            nanosleep(&delay, NULL);
+        }
+    }
     while (t->child) {
         int status;
         pid_t pid = waitpid(-1, &status, 0);

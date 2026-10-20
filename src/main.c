@@ -13,6 +13,7 @@ int main(void) {
     Agency *a = calloc(1, sizeof(*a));
     if (!a) { perror("allocate agency"); return 1; }
     if (workspace_open(a)) { perror("workspace"); free(a); return 1; }
+    if (recover_workspace(a)) { perror("recover workspace"); close(a->lock_fd); free(a); return 1; }
     sigset_t original;
     if (process_init(&original)) { perror("signals"); close(a->lock_fd); free(a); return 1; }
     char line[LINE];
@@ -22,6 +23,7 @@ int main(void) {
     if (interactive) { fputs("agency> ", stdout); fflush(stdout); }
     while (!exiting) {
         reap(a);
+        monitor_recovered(a);
         fd_set fds;
         FD_ZERO(&fds);
         FD_SET(STDIN_FILENO, &fds);

@@ -1,8 +1,8 @@
 CC = cc
-CPPFLAGS = -D_POSIX_C_SOURCE=200809L -Iinclude
+CPPFLAGS = -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude
 CFLAGS = -std=c11 -Wall -Wextra -Werror -O2 -g
 .PHONY: all test clean
-SOURCES = src/main.c src/cli.c src/orchestrator.c src/process.c src/workspace.c src/protocol.c
+SOURCES = src/main.c src/cli.c src/orchestrator.c src/process.c src/workspace.c src/protocol.c src/mailbox.c
 OBJECTS = $(SOURCES:%.c=build/%.o)
 all: agency
 agency: $(OBJECTS)
@@ -11,7 +11,10 @@ build/%.o: %.c
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -MP -c $< -o $@
 -include $(OBJECTS:.o=.d)
-test:
+build/fixture: tests/fixture.c
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $< -o $@
+test: all build/fixture
 	sh tests/run_tests.sh
 clean:
 	rm -rf build agency

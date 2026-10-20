@@ -61,3 +61,52 @@ exec 3>&-
 wait "$agency_pid"
 echo 'PASS P1: SIGCHLD idle reaping; child PID absent from ps'
 cd "$root"
+cd "$tmp"
+cp "$root/build/fixture" agents/fixture
+printf 'test input\n' > data/input.txt
+cat > external.task <<'TASK'
+id: task_020
+agent: fixture
+input: data/input.txt
+TASK
+printf 'submit external.task\ncollect task_020\nsubmit external.task\ntasks\nexit\n' | ./agency > mailbox-output 2>&1
+test -f tasks/task_020.task
+grep -q 'state: done' status/task_020.status
+grep -q 'data/task_020.out' logs/task_020.log
+grep -q 'Duplicate task id: task_020' mailbox-output
+grep -q 'no report produced' mailbox-output
+# Invalid tasks must not create any status/log or fork.
+for field in id agent input; do
+    sed "/^$field:/d" external.task > invalid.task
+    printf 'submit invalid.task\nexit\n' | ./agency > invalid-output 2>&1
+    grep -q 'Invalid task file' invalid-output
+done
+sed 's/task_020/task_021/; s/fixture/missing/' external.task > invalid.task
+printf 'submit invalid.task\nexit\n' | ./agency > invalid-output 2>&1
+grep -q 'Agent executable unavailable' invalid-output
+test ! -f status/task_021.status
+sed 's/task_020/task_022/; s@data/input.txt@data/missing@' external.task > invalid.task
+printf 'submit invalid.task\nexit\n' | ./agency > invalid-output 2>&1
+grep -q 'Input unreadable' invalid-output
+test ! -f status/task_022.status
+sed 's/task_020/task_023/' external.task > invalid.task
+printf 'output: status/task_023.status\n' >> invalid.task
+printf 'submit invalid.task\nexit\n' | ./agency > invalid-output 2>&1
+grep -q 'reserved directory' invalid-output
+test ! -f status/task_023.status
+printf 'status task_020\nrun /bin/true\nexit\n' | ./agency > restart-output 2>&1
+grep -q 'state: done' restart-output
+test -f status/task_021.status
+# Dead persisted PID can never be assigned a fabricated normal exit.
+cat > status/task_030.status <<'STATUS'
+id: task_030
+agent: fixture
+pid: 2147483647
+state: running
+collected: no
+STATUS
+printf 'status task_030\nexit\n' | ./agency > recovery-output 2>&1
+grep -q 'state: error' status/task_030.status
+grep -q 'exit status unavailable after restart' recovery-output
+echo 'PASS P2: submit argv/default output, duplicate/preflight, canonical task, persistent IDs/recovery'
+cd "$root"
