@@ -169,3 +169,23 @@ grep -q 'Unknown recipient agent' invalid-send-output
 test "$(find messages -name '*.txt' | wc -l | tr -d ' ')" = 2
 echo 'PASS P4: atomic numbered messages/restart, reporter briefing and durable consumption, send validation'
 cd "$root"
+# Isolated advisor scenarios must not inherit earlier deliberately failed tasks.
+adv="$tmp/advisor"
+mkdir -p "$adv/tasks" "$adv/status" "$adv/reports" "$adv/messages" "$adv/logs" "$adv/data" "$adv/agents"
+cp agency "$adv/"
+cp agents/analyst agents/reporter "$adv/agents/"
+cp tasks/task_001.task tasks/task_002.task "$adv/tasks/"
+cp data/survey.csv data/report_request.txt "$adv/data/"
+cd "$adv"
+printf 'suggest\nexit\n' | ./agency > initial-output
+grep -q '^submit tasks/task_001.task$' initial-output
+test "$(find status -name '*.status' | wc -l | tr -d ' ')" = 0
+printf 'submit tasks/task_001.task\nwait task_001\nsuggest\ncollect task_001\nsuggest\nsend analyst reporter task_001 "please brief"\nsuggest\nsubmit tasks/task_002.task\ncollect task_002\nsuggest\nexit\n' | ./agency > advisor-output 2>&1
+grep -q '^collect task_001$' advisor-output
+grep -q '^send analyst reporter task_001 "please brief"$' advisor-output
+grep -q '^submit tasks/task_002.task$' advisor-output
+grep -q '^No pending suggestions.$' advisor-output
+printf 'run /bin/sh -c "exit 2"\nwait task_003\nsuggest\nexit\n' | ./agency > failed-suggestion
+grep -q 'log task_003;.*new ID' failed-suggestion
+echo 'PASS P5: advisor initial/collect/send/submit/complete/failure priorities; no automatic execution'
+cd "$root"

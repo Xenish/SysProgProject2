@@ -3,6 +3,7 @@
 #include "protocol.h"
 #include "workspace.h"
 #include "mailbox.h"
+#include "advisor.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -34,7 +35,7 @@ int dispatch(Agency *a, int argc, char **argv) {
     const char *cmd = argv[0];
     if (!strcmp(cmd, "exit") && argc == 1) return 1;
     if (!strcmp(cmd, "help") && argc == 1) {
-        puts("send <from> <to> <task_id> <message> | submit <task_file> | tasks | collect <task_id> | run <program> [args...] | list | status/wait/report/log <task_id> | exit | help");
+        puts("suggest | send <from> <to> <task_id> <message> | submit <task_file> | tasks | collect <task_id> | run <program> [args...] | list | status/wait/report/log <task_id> | exit | help");
     } else if (!strcmp(cmd, "run") && argc >= 2) {
         if (a->count == MAX_TASKS) { fputs("Task table full\n", stderr); return 0; }
         Task *t = &a->tasks[a->count];
@@ -42,6 +43,8 @@ int dispatch(Agency *a, int argc, char **argv) {
         if (next_task_id(t->id, sizeof(t->id)) || !single_line(argv[1]) || copy_field(t->agent, sizeof(t->agent), argv[1])) { perror("run validation"); return 0; }
         ++a->count;
         launch(a, t, argv + 1);
+    } else if (!strcmp(cmd, "suggest") && argc == 1) {
+        suggest(a);
     } else if (!strcmp(cmd, "send") && argc >= 5) {
         char message[FIELD] = "";
         size_t used = 0;
