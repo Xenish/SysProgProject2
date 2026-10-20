@@ -1,0 +1,61 @@
+Linux 2bd950debfc9 6.12.76-linuxkit #1 SMP Thu Jun 25 13:45:40 UTC 2026 aarch64 aarch64 aarch64 GNU/Linux
+PRETTY_NAME="Ubuntu 24.04.5 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.5 LTS (Noble Numbat)"
+VERSION_CODENAME=noble
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=noble
+LOGO=ubuntu-logo
+cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+Copyright (C) 2023 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g tools/clean.c src/protocol.c -o build/clean
+./build/clean
+rm -rf build agency
+rm -f agents/analyst agents/reporter agents/scout
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c src/main.c -o build/src/main.o
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c src/cli.c -o build/src/cli.o
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c src/orchestrator.c -o build/src/orchestrator.o
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c src/process.c -o build/src/process.o
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c src/workspace.c -o build/src/workspace.o
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c src/protocol.c -o build/src/protocol.o
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c src/mailbox.c -o build/src/mailbox.o
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c src/advisor.c -o build/src/advisor.o
+cc -std=c11 -Wall -Wextra -Werror -O2 -g build/src/main.o build/src/cli.o build/src/orchestrator.o build/src/process.o build/src/workspace.o build/src/protocol.o build/src/mailbox.o build/src/advisor.o -o agency
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c agents/analyst.c -o build/agents/analyst.o
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c agents/agent_common.c -o build/agents/agent_common.o
+cc -std=c11 -Wall -Wextra -Werror -O2 -g build/agents/analyst.o build/agents/agent_common.o build/src/protocol.o -o agents/analyst
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c agents/reporter.c -o build/agents/reporter.o
+cc -std=c11 -Wall -Wextra -Werror -O2 -g build/agents/reporter.o build/agents/agent_common.o build/src/protocol.o -o agents/reporter
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c agents/scout.c -o build/agents/scout.o
+cc -std=c11 -Wall -Wextra -Werror -O2 -g build/agents/scout.o build/agents/agent_common.o build/src/protocol.o -o agents/scout
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g tests/fixture.c -o build/fixture
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g tools/clean.c src/protocol.c -o build/clean
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g tests/protocol_test.c src/protocol.c src/cli.c -o build/protocol-test
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -Dfork=agency_test_fork -Dexecvp=agency_test_execvp -Dwaitpid=agency_test_waitpid src/main.c src/cli.c src/orchestrator.c src/process.c src/workspace.c src/protocol.c src/mailbox.c src/advisor.c tests/faults.c -o build/fault-agency
+sh tests/run_tests.sh
+PASS P0: workspace and authored fixtures
+PASS P1: run/list/status/wait/log/report; nonzero/127/exec/signal semantics
+PASS P1: SIGCHLD idle reaping; child PID absent from ps
+PASS P2: submit argv/default output, duplicate/preflight, canonical task, persistent IDs/recovery
+PASS P3: analyst CSV/output/report, malformed data done:2, reporter missing-message contract
+PASS P4: atomic numbered messages/restart, reporter briefing and durable consumption, send validation
+PASS P5: advisor initial/collect/send/submit/complete/failure priorities; no automatic execution
+PASS P6: scout case-sensitive ERROR search, output/report and no-match exit:1
+PASS P7: atomic flush/rename/symlink failures preserve final; protocol NUL/duplicate and CLI quoting
+Unclosed quote
+PASS P7: injected fork/exec/waitpid failures; all started child PIDs reaped
+PASS P7: fcntl single orchestrator and clean lock protection
+PASS P7: concurrent reporter rejection
+PASS P7: live detached PID monitoring, SIGKILL restart and persisted ID authority
+PASS P7: make clean preserves authored inputs/examples/.gitkeep; removes generated canonical/tasks/status/report/message/log
+PASS P7: output/canonical ownership, numeric message counter/order, failed status pre-fork, CLI bounds/no expansion
+PASS P7: reporter missing source; CSV zero ID/NaN/Inf/missing/extra/NUL rejection and CRLF support

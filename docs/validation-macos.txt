@@ -1,0 +1,22 @@
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g tests/fixture.c -o build/fixture
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g tools/clean.c src/protocol.c -o build/clean
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g tests/protocol_test.c src/protocol.c src/cli.c -o build/protocol-test
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -Dfork=agency_test_fork -Dexecvp=agency_test_execvp -Dwaitpid=agency_test_waitpid src/main.c src/cli.c src/orchestrator.c src/process.c src/workspace.c src/protocol.c src/mailbox.c src/advisor.c tests/faults.c -o build/fault-agency
+sh tests/run_tests.sh
+PASS P0: workspace and authored fixtures
+PASS P1: run/list/status/wait/log/report; nonzero/127/exec/signal semantics
+PASS P1: SIGCHLD idle reaping; child PID absent from ps
+PASS P2: submit argv/default output, duplicate/preflight, canonical task, persistent IDs/recovery
+PASS P3: analyst CSV/output/report, malformed data done:2, reporter missing-message contract
+PASS P4: atomic numbered messages/restart, reporter briefing and durable consumption, send validation
+PASS P5: advisor initial/collect/send/submit/complete/failure priorities; no automatic execution
+PASS P6: scout case-sensitive ERROR search, output/report and no-match exit:1
+Unclosed quote
+PASS P7: atomic flush/rename/symlink failures preserve final; protocol NUL/duplicate and CLI quoting
+PASS P7: injected fork/exec/waitpid failures; all started child PIDs reaped
+PASS P7: fcntl single orchestrator and clean lock protection
+PASS P7: concurrent reporter rejection
+PASS P7: live detached PID monitoring, SIGKILL restart and persisted ID authority
+PASS P7: make clean preserves authored inputs/examples/.gitkeep; removes generated canonical/tasks/status/report/message/log
+PASS P7: output/canonical ownership, numeric message counter/order, failed status pre-fork, CLI bounds/no expansion
+PASS P7: reporter missing source; CSV zero ID/NaN/Inf/missing/extra/NUL rejection and CRLF support

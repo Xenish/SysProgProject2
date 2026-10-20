@@ -1,0 +1,199 @@
+Linux 825e93c9aef9 6.12.76-linuxkit #1 SMP Thu Jun 25 13:45:40 UTC 2026 aarch64 aarch64 aarch64 GNU/Linux
+$ make clean && make
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g tools/clean.c src/protocol.c -o build/clean
+./build/clean
+rm -rf build agency
+rm -f agents/analyst agents/reporter agents/scout
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c src/main.c -o build/src/main.o
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c src/cli.c -o build/src/cli.o
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c src/orchestrator.c -o build/src/orchestrator.o
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c src/process.c -o build/src/process.o
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c src/workspace.c -o build/src/workspace.o
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c src/protocol.c -o build/src/protocol.o
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c src/mailbox.c -o build/src/mailbox.o
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c src/advisor.c -o build/src/advisor.o
+cc -std=c11 -Wall -Wextra -Werror -O2 -g build/src/main.o build/src/cli.o build/src/orchestrator.o build/src/process.o build/src/workspace.o build/src/protocol.o build/src/mailbox.o build/src/advisor.o -o agency
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c agents/analyst.c -o build/agents/analyst.o
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c agents/agent_common.c -o build/agents/agent_common.o
+cc -std=c11 -Wall -Wextra -Werror -O2 -g build/agents/analyst.o build/agents/agent_common.o build/src/protocol.o -o agents/analyst
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c agents/reporter.c -o build/agents/reporter.o
+cc -std=c11 -Wall -Wextra -Werror -O2 -g build/agents/reporter.o build/agents/agent_common.o build/src/protocol.o -o agents/reporter
+cc -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700 -Iinclude -std=c11 -Wall -Wextra -Werror -O2 -g -MMD -MP -c agents/scout.c -o build/agents/scout.o
+cc -std=c11 -Wall -Wextra -Werror -O2 -g build/agents/scout.o build/agents/agent_common.o build/src/protocol.o -o agents/scout
+
+$ ./agency < demo.commands
+Inputs:
+help
+tasks
+suggest
+run /bin/sleep 0.3
+status task_004
+list
+wait task_004
+submit tasks/task_001.task
+status task_001
+collect task_001
+suggest
+send analyst reporter task_001 "please brief"
+suggest
+submit tasks/task_002.task
+collect task_002
+report task_002
+log task_001
+suggest
+submit tasks/task_003.task
+collect task_003
+exit
+
+Actual output:
+suggest | send <from> <to> <task_id> <message> | submit <task_file> | tasks | collect <task_id> | run <program> [args...] | list | status/wait/report/log <task_id> | exit | help
+ID AGENT STATE
+task_002 reporter PENDING
+task_003 scout PENDING
+task_001 analyst PENDING
+submit tasks/task_001.task
+Task submitted: task_004 (agent: /bin/sleep, pid 101)
+id: task_004
+agent: /bin/sleep
+pid: 101
+state: running
+collected: no
+canonical_created: no
+ID AGENT PID STATE
+task_004 /bin/sleep 101 running
+Task submitted: task_001 (agent: analyst, pid 102)
+id: task_001
+agent: analyst
+pid: 102
+state: running
+collected: no
+canonical_created: no
+agent: analyst
+input: data/survey.csv
+rows_processed: 4
+sum: 320
+average: 80.00
+status: success
+send analyst reporter task_001 "please brief"
+Message sent: messages/msg_001.analyst.reporter.txt
+submit tasks/task_002.task
+Task submitted: task_002 (agent: reporter, pid 103)
+agent: reporter
+input: data/report_request.txt
+source_task: task_001
+source_message: msg_001.analyst.reporter.txt
+briefing: reports/task_001.briefing
+status: success
+agent: reporter
+input: data/report_request.txt
+source_task: task_001
+source_message: msg_001.analyst.reporter.txt
+briefing: reports/task_001.briefing
+status: success
+Analyst processed 4 rows
+No pending suggestions.
+Task submitted: task_003 (agent: scout, pid 104)
+agent: scout
+input: data/events.txt
+rows_processed: 5
+matching_lines: 2
+keyword: ERROR
+status: success
+
+$ ls status
+task_001.status
+task_002.status
+task_003.status
+task_004.status
+
+$ cat reports/task_001.briefing
+Agency briefing
+Source task: task_001
+Source message: msg_001.analyst.reporter.txt
+agent: analyst
+input: data/survey.csv
+rows_processed: 4
+sum: 320
+average: 80.00
+status: success
+
+$ cat status/task_001.status
+id: task_001
+agent: analyst
+pid: 102
+state: done
+collected: yes
+canonical_created: no
+exit_code: 0
+report: reports/task_001.report
+
+$ ./agency (restart: tasks, status task_002, suggest, exit)
+ID AGENT STATE
+task_001 analyst done
+task_002 reporter done
+task_003 scout done
+task_004 /bin/sleep done
+id: task_002
+agent: reporter
+pid: 103
+state: done
+collected: yes
+canonical_created: no
+exit_code: 0
+report: reports/task_002.report
+No pending suggestions.
+
+$ ps aux | grep defunct
+root       111  0.0  0.0   3128  1528 ?        S    23:24   0:00 grep defunct
+
+$ ps aux | grep "[d]efunct"
+
+Owned demo child PID checks:
+PID 102: absent (reaped)
+PID 103: absent (reaped)
+PID 104: absent (reaped)
+PID 101: absent (reaped)
+
+Atomic publishing implementation (src/protocol.c):
+FILE *atomic_begin(const char *path) {
+    char tmp[FIELD + 4];
+    if (temp_path(tmp, sizeof(tmp), path)) return NULL;
+    struct stat previous;
+    if (lstat(tmp, &previous) == 0) {
+        if (!S_ISREG(previous.st_mode) || previous.st_nlink != 1) { errno = EINVAL; return NULL; }
+        if (unlink(tmp)) return NULL;
+    } else if (errno != ENOENT) return NULL;
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL, 0600);
+    if (fd < 0) return NULL;
+    struct stat st;
+    if (fstat(fd, &st) || !S_ISREG(st.st_mode)) { close(fd); errno = EINVAL; return NULL; }
+    FILE *fp = fdopen(fd, "w");
+    if (!fp) { int saved = errno; close(fd); errno = saved; }
+    return fp;
+}
+int atomic_finish(FILE *fp, const char *path) {
+    char tmp[FIELD + 4];
+    if (temp_path(tmp, sizeof(tmp), path)) { fclose(fp); return -1; }
+    int bad = ferror(fp);
+    if (fflush(fp)) bad = 1;
+    if (fclose(fp)) bad = 1;
+    if (!bad && rename(tmp, path) == 0) return 0;
+    int saved = errno;
+    unlink(tmp);
+    errno = saved ? saved : EIO;
+    return -1;
+}
+void atomic_abort(FILE *fp, const char *path) {
+    char tmp[FIELD + 4];
+    if (fp) fclose(fp);
+    if (!temp_path(tmp, sizeof(tmp), path)) unlink(tmp);
+}
+int atomic_text(const char *path, const char *text) {
+    FILE *fp = atomic_begin(path);
+    if (!fp) return -1;
+    if (fputs(text, fp) == EOF) { atomic_abort(fp, path); return -1; }
+    return atomic_finish(fp, path);
+}
+int print_file(const char *path) {
+
+PASS: canonical analyst -> reporter demo, scout, restart, child PID checks
