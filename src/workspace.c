@@ -97,6 +97,7 @@ int recover_workspace(Agency *a) {
                 } else if (strcmp(t.state, "running") && strcmp(t.state, "error")) bad = 1;
                 if (!strcmp(t.state, "running") && t.pid <= 0) bad = 1;
                 t.collected = !strcmp(value(&doc, "collected"), "yes");
+                t.canonical_created = !strcmp(value(&doc, "canonical_created"), "yes");
                 if (!task_path(taskfile, sizeof(taskfile), "tasks", t.id, "task")) {
                     Task spec;
                     if (!read_task(taskfile, &spec)) {

@@ -14,7 +14,7 @@ typedef struct {
     char state[16], message[FIELD];
     pid_t pid;
     int exit_code;
-    bool collected, child;
+    bool collected, child, canonical_created;
 } Task;
 typedef struct {
     Task tasks[MAX_TASKS];

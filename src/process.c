@@ -18,6 +18,8 @@ int process_init(sigset_t *original) {
     action.sa_handler = on_child;
     sigemptyset(&action.sa_mask);
     if (sigaction(SIGCHLD, &action, NULL)) return -1;
+    /* Block SIGCHLD between loop iterations; pselect atomically unmasks it.
+       This closes the check-before-block race without doing I/O in a handler. */
     sigset_t blocked;
     sigemptyset(&blocked);
     sigaddset(&blocked, SIGCHLD);
@@ -30,14 +32,23 @@ static void error_task(Task *t, const char *message) {
 }
 int launch(Agency *a, Task *t, char **argv) {
     (void)a;
+    strcpy(t->state, "error");
+    strcpy(t->message, "launch interrupted before PID publication");
+    if (save_status(t)) { perror("reserve task ID"); return -1; }
     char path[FIELD];
     if (task_path(path, sizeof(path), "logs", t->id, "log")) return -1;
-    int logfd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0600);
+    char temporary[FIELD + 4];
+    int path_len = snprintf(temporary, sizeof(temporary), "%s.tmp", path);
+    if (path_len < 0 || (size_t)path_len >= sizeof(temporary) || access(path, F_OK) == 0) {
+        error_task(t, "log already exists or invalid path"); return -1;
+    }
+    int logfd = open(temporary, O_WRONLY | O_CREAT | O_EXCL, 0600);
     if (logfd < 0) { error_task(t, "cannot create log"); return -1; }
+    /* EOF proves exec succeeded; a normal exit(127) sends no errno payload. */
     int error_pipe[2];
-    if (pipe(error_pipe)) { close(logfd); error_task(t, "pipe failed"); return -1; }
+    if (pipe(error_pipe)) { close(logfd); unlink(temporary); error_task(t, "pipe failed"); return -1; }
     if (fcntl(error_pipe[1], F_SETFD, FD_CLOEXEC)) {
-        close(logfd); close(error_pipe[0]); close(error_pipe[1]); error_task(t, "fcntl failed"); return -1;
+        close(logfd); unlink(temporary); close(error_pipe[0]); close(error_pipe[1]); error_task(t, "fcntl failed"); return -1;
     }
     pid_t pid = fork();
     if (pid == 0) {
@@ -55,7 +66,7 @@ int launch(Agency *a, Task *t, char **argv) {
         _exit(127);
     }
     close(logfd); close(error_pipe[1]);
-    if (pid < 0) { close(error_pipe[0]); error_task(t, "fork failed"); return -1; }
+    if (pid < 0) { close(error_pipe[0]); unlink(temporary); error_task(t, "fork failed"); return -1; }
     t->pid = pid;
     t->child = true;
     int child_errno = 0;
@@ -68,7 +79,7 @@ int launch(Agency *a, Task *t, char **argv) {
         error_task(t, msg);
     } else {
         copy_field(t->state, sizeof(t->state), "running");
-        if (save_status(t)) { perror("status publish"); return -1; }
+        if (save_status(t)) { perror("status publish"); strcpy(t->state, "error"); strcpy(t->message, "running status publish failed"); return -1; }
     }
     printf("Task submitted: %s (agent: %s, pid %ld)\n", t->id, t->agent, (long)pid);
     return n == 0 ? 0 : -1;
@@ -78,6 +89,13 @@ static void completed(Agency *a, pid_t pid, int status) {
         Task *t = &a->tasks[i];
         if (!t->child || t->pid != pid) continue;
         t->child = false;
+        /* Publish the log only after its sole writer has exited. */
+        char path[FIELD], temporary[FIELD + 4];
+        if (task_path(path, sizeof(path), "logs", t->id, "log")) { error_task(t, "invalid log path"); return; }
+        int n = snprintf(temporary, sizeof(temporary), "%s.tmp", path);
+        if (n < 0 || (size_t)n >= sizeof(temporary) || rename(temporary, path)) {
+            error_task(t, "log publish failed"); return;
+        }
         if (!strcmp(t->state, "error")) return;
         if (WIFEXITED(status)) {
             copy_field(t->state, sizeof(t->state), "done");
@@ -91,9 +109,9 @@ static void completed(Agency *a, pid_t pid, int status) {
         return;
     }
 }
-static void wait_failure(Agency *a) {
+static void wait_failure(Agency *a, int lost) {
     for (size_t i = 0; i < a->count; ++i) if (a->tasks[i].child) {
-        a->tasks[i].child = false;
+        if (lost) a->tasks[i].child = false;
         error_task(&a->tasks[i], "waitpid failed: exit status unavailable");
     }
 }
@@ -104,7 +122,7 @@ void reap(Agency *a) {
         pid_t pid = waitpid(-1, &status, WNOHANG);
         if (pid > 0) completed(a, pid, status);
         else if (pid < 0 && errno == EINTR) continue;
-        else { if (pid < 0 && errno != ECHILD) wait_failure(a); break; }
+        else { if (pid < 0) wait_failure(a, errno == ECHILD); break; }
     }
 }
 void wait_task(Agency *a, Task *t) {
@@ -120,7 +138,13 @@ void wait_task(Agency *a, Task *t) {
         int status;
         pid_t pid = waitpid(-1, &status, 0);
         if (pid > 0) completed(a, pid, status);
-        else if (errno != EINTR) { wait_failure(a); break; }
+        else if (errno != EINTR) {
+            int lost = errno == ECHILD;
+            wait_failure(a, lost);
+            if (lost) break;
+            struct timespec delay = {.tv_sec = 0, .tv_nsec = 10000000};
+            nanosleep(&delay, NULL);
+        }
     }
 }
 void wait_children(Agency *a) {

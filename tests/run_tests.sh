@@ -210,3 +210,187 @@ grep -q 'matching_lines: 0' reports/task_051.report
 test ! -s data/task_051.out
 echo 'PASS P6: scout case-sensitive ERROR search, output/report and no-match exit:1'
 cd "$root"
+cd "$tmp"
+mkdir protocol-unit
+(cd protocol-unit && "$root/build/protocol-test")
+# Infrastructure fault binary calls the real POSIX functions except one selected failure.
+for failure in fork exec waitpid; do
+    faultdir="$tmp/fault-$failure"
+    mkdir -p "$faultdir/tasks" "$faultdir/status" "$faultdir/reports" "$faultdir/messages" "$faultdir/logs" "$faultdir/data"
+    cp "$root/build/fault-agency" "$faultdir/agency"
+    (cd "$faultdir"; printf 'run /bin/sleep 0.1\nwait task_001\nexit\n' | AGENCY_TEST_FAULT="$failure" ./agency > output 2>&1)
+    grep -q 'state: error' "$faultdir/status/task_001.status"
+    case "$failure" in
+        fork) grep -q 'fork failed' "$faultdir/status/task_001.status" ;;
+        exec) grep -q 'exec/child setup failed' "$faultdir/status/task_001.status" ;;
+        waitpid) grep -q 'waitpid failed' "$faultdir/status/task_001.status" ;;
+    esac
+    pid=$(sed -n 's/^pid: //p' "$faultdir/status/task_001.status")
+    if test "$pid" != 0 && ps -p "$pid" -o stat= >/dev/null 2>&1; then echo 'FAIL: fault left child'; exit 1; fi
+done
+echo 'PASS P7: injected fork/exec/waitpid failures; all started child PIDs reaped'
+# Hold a workspace lock; neither a second agency nor clean may mutate files.
+mkfifo locked-input
+./agency < locked-input > locked-output 2>&1 &
+locked_pid=$!
+exec 3>locked-input
+printf 'help\n' >&3
+sleep 0.1
+if printf 'exit\n' | ./agency > lock-error 2>&1; then echo 'FAIL: double orchestrator'; exit 1; fi
+grep -q 'Workspace locked' lock-error
+if "$root/build/clean" > clean-lock-error 2>&1; then echo 'FAIL: clean accepted locked workspace'; exit 1; fi
+grep -q 'Cannot clean a locked workspace' clean-lock-error
+printf 'exit\n' >&3
+exec 3>&-
+wait "$locked_pid"
+echo 'PASS P7: fcntl single orchestrator and clean lock protection'
+# Concurrent reporter jobs must not consume the same message.
+cp agents/reporter real-reporter
+cp "$root/build/fixture" agents/reporter
+printf 'delay input\n' > data/delay.txt
+for id in 060 061; do
+    printf 'id: task_%s\nagent: reporter\ninput: data/delay.txt\noutput: data/task_%s.out\n' "$id" "$id" > "tasks/task_$id.task"
+done
+printf 'submit tasks/task_060.task\nsubmit tasks/task_061.task\nexit\n' | ./agency > concurrent-output 2>&1
+grep -q 'A reporter is already running' concurrent-output
+test ! -f status/task_061.status
+mv real-reporter agents/reporter
+echo 'PASS P7: concurrent reporter rejection'
+# A recovered PID is not our child. Observe it until its real parent reaps it.
+sleep 0.4 &
+detached_pid=$!
+printf 'id: task_070\nagent: fixture\npid: %s\nstate: running\ncollected: no\n' "$detached_pid" > status/task_070.status
+mkfifo recovery-input
+./agency < recovery-input > live-recovery-output 2>&1 &
+recovery_pid=$!
+exec 3>recovery-input
+printf 'wait task_070\nstatus task_070\nexit\n' >&3
+wait "$detached_pid"
+exec 3>&-
+wait "$recovery_pid"
+grep -q 'exit status unavailable after restart' status/task_070.status
+grep -q 'state: error' status/task_070.status
+# Actual orchestrator crash: persisted terminal states and ID authority survive SIGKILL.
+mkfifo crash-input
+./agency < crash-input > crash-output 2>&1 &
+crash_pid=$!
+exec 3>crash-input
+printf 'status task_040\n' >&3
+sleep 0.1
+kill -KILL "$crash_pid"
+exec 3>&-
+wait "$crash_pid" 2>/dev/null || :
+printf 'status task_040\nrun /bin/true\nexit\n' | ./agency > actual-restart-output
+grep -q 'exit_code: 0' actual-restart-output
+test -f status/task_071.status
+echo 'PASS P7: live detached PID monitoring, SIGKILL restart and persisted ID authority'
+# make clean in a disposable project copy; preserve authored examples/placeholders.
+cleandir="$tmp/cleanup"
+mkdir "$cleandir"
+(cd "$root"; tar -cf - Makefile tools src include tasks data status reports messages logs) | (cd "$cleandir"; tar -xf -)
+cp -R status/. "$cleandir/status/"
+cp -R tasks/. "$cleandir/tasks/"
+cp -R reports/. "$cleandir/reports/"
+cp -R messages/. "$cleandir/messages/"
+cp -R logs/. "$cleandir/logs/"
+printf 'authored example\n' > "$cleandir/reports/example.report"
+printf 'authored input\n' > "$cleandir/data/custom.txt"
+(cd "$cleandir"; make clean > clean-output)
+for dir in tasks status reports messages logs data; do test -f "$cleandir/$dir/.gitkeep"; done
+test -f "$cleandir/tasks/task_001.task"
+test -f "$cleandir/data/survey.csv"
+test -f "$cleandir/reports/example.report"
+test -f "$cleandir/data/custom.txt"
+test ! -f "$cleandir/tasks/task_020.task"
+test ! -f "$cleandir/status/task_040.status"
+test ! -f "$cleandir/reports/task_040.report"
+test ! -f "$cleandir/reports/task_040.briefing"
+test ! -f "$cleandir/messages/msg_001.analyst.reporter.txt"
+echo 'PASS P7: make clean preserves authored inputs/examples/.gitkeep; removes generated canonical/tasks/status/report/message/log'
+cd "$root"
+cd "$tmp"
+# Canonical conflict and same-output ownership must not silently clobber work.
+cat > tasks/task_080.task <<'TASK'
+id: task_080
+agent: fixture
+input: data/input.txt
+output: data/owned.out
+TASK
+sed 's/task_080/task_081/' tasks/task_080.task > external-conflict.task
+printf 'submit external-conflict.task\nexit\n' | ./agency > output-conflict 2>&1
+grep -q 'Output owned by another task' output-conflict
+test ! -f status/task_081.status
+sed 's@data/owned.out@data/different.out@' tasks/task_080.task > external-conflict.task
+printf 'submit external-conflict.task\nexit\n' | ./agency > canonical-conflict 2>&1
+grep -q 'Canonical task conflict' canonical-conflict
+test ! -f status/task_080.status
+cp messages/msg_001.analyst.reporter.txt messages/msg_999.analyst.reporter.txt
+printf 'send analyst reporter task_040 after999\nexit\n' | ./agency > large-message-counter
+test -f messages/msg_1000.analyst.reporter.txt
+# Reporter chooses numeric oldest, not lexical order, and skips successful ACK metadata.
+set +e
+agents/reporter task_082 data/report_request.txt reports/numeric.briefing > numeric-output
+code=$?
+set -e
+test "$code" = 0
+grep -q 'source_message: msg_002.analyst.reporter.txt' reports/task_082.report
+agents/reporter task_084 data/report_request.txt reports/numeric999.briefing > numeric999-output
+grep -q 'source_message: msg_999.analyst.reporter.txt' reports/task_084.report
+agents/reporter task_085 data/report_request.txt reports/numeric1000.briefing > numeric1000-output
+grep -q 'source_message: msg_1000.analyst.reporter.txt' reports/task_085.report
+# Failed initial status publication must prevent fork/log creation.
+sed 's/task_080/task_082/g; s@data/owned.out@data/task_082.out@' tasks/task_080.task > tasks/task_082.task
+mkdir status/task_083.status.tmp
+printf 'run /bin/true\nexit\n' | ./agency > failed-publish-output 2>&1
+test ! -f logs/task_083.log
+test ! -f logs/task_083.log.tmp
+test ! -f status/task_083.status
+rmdir status/task_083.status.tmp
+# Shell syntax is deliberately not expanded, and oversized lines recover at newline.
+{
+    printf 'run /bin/echo "$HOME;literal"\nwait task_083\n'
+    awk 'BEGIN { for (i=0;i<9000;i++) printf "x"; printf "\n" }'
+    printf 'help\nexit\n'
+} | ./agency > parser-output 2>&1
+grep -q '\$HOME;literal' logs/task_083.log
+grep -q 'Command line too long' parser-output
+grep -q 'submit <task_file>' parser-output
+echo 'PASS P7: output/canonical ownership, numeric message counter/order, failed status pre-fork, CLI bounds/no expansion'
+cd "$root"
+
+cd "$tmp"
+cat > messages/msg_1001.analyst.reporter.txt <<'MESSAGE'
+from: analyst
+to: reporter
+task: task_999
+message: missing source
+MESSAGE
+set +e
+agents/reporter task_086 data/report_request.txt reports/missing.briefing > missing-source-output 2>&1
+code=$?
+set -e
+test "$code" = 1
+grep -q 'source report unavailable' reports/task_086.report
+test ! -f reports/missing.briefing
+n=90
+for row in '0,10' '1,nan' '1,inf' '1,' '1,20,30' 'oops,20'; do
+    printf 'id,score\n%s\n' "$row" > data/invalid.csv
+    set +e
+    agents/analyst "task_0$n" data/invalid.csv data/invalid.out > csv-validation-output 2>&1
+    code=$?
+    set -e
+    test "$code" = 2
+    test ! -f data/invalid.out
+    n=$((n + 1))
+done
+printf 'id,score\000ignored\n1,10\n' > data/invalid.csv
+set +e
+agents/analyst task_096 data/invalid.csv data/invalid.out > csv-validation-output 2>&1
+code=$?
+set -e
+test "$code" = 2
+printf 'id,score\r\n1,70\r\n' > data/crlf.csv
+agents/analyst task_097 data/crlf.csv data/crlf.out > crlf-output
+grep -q 'average: 70.00' reports/task_097.report
+echo 'PASS P7: reporter missing source; CSV zero ID/NaN/Inf/missing/extra/NUL rejection and CRLF support'
+cd "$root"

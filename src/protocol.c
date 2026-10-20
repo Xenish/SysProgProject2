@@ -2,9 +2,11 @@
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 int copy_field(char *dst, size_t size, const char *src) {
     if (strlen(src) >= size) { errno = EOVERFLOW; return -1; }
@@ -43,8 +45,15 @@ int read_document(const char *path, Document *doc) {
     memset(doc, 0, sizeof(*doc));
     char line[LINE];
     int result = 0;
-    while (fgets(line, sizeof(line), fp)) {
-        if (!strchr(line, '\n') && !feof(fp)) { result = -1; break; }
+    while (!feof(fp) && !ferror(fp)) {
+        size_t used = 0;
+        int c;
+        while ((c = fgetc(fp)) != EOF && c != '\n') {
+            if (c == 0 || used + 1 >= sizeof(line)) { result = -1; break; }
+            line[used++] = (char)c;
+        }
+        if (result || (c == EOF && !used)) break;
+        line[used] = '\0';
         char *s = trim(line);
         if (!*s) continue;
         char *sep = strchr(s, ':');
@@ -75,7 +84,18 @@ static int temp_path(char *tmp, size_t size, const char *path) {
 FILE *atomic_begin(const char *path) {
     char tmp[FIELD + 4];
     if (temp_path(tmp, sizeof(tmp), path)) return NULL;
-    return fopen(tmp, "w");
+    struct stat previous;
+    if (lstat(tmp, &previous) == 0) {
+        if (!S_ISREG(previous.st_mode) || previous.st_nlink != 1) { errno = EINVAL; return NULL; }
+        if (unlink(tmp)) return NULL;
+    } else if (errno != ENOENT) return NULL;
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL, 0600);
+    if (fd < 0) return NULL;
+    struct stat st;
+    if (fstat(fd, &st) || !S_ISREG(st.st_mode)) { close(fd); errno = EINVAL; return NULL; }
+    FILE *fp = fdopen(fd, "w");
+    if (!fp) { int saved = errno; close(fd); errno = saved; }
+    return fp;
 }
 int atomic_finish(FILE *fp, const char *path) {
     char tmp[FIELD + 4];
@@ -106,9 +126,13 @@ int print_file(const char *path) {
     char buf[4096];
     size_t n;
     int bad = 0;
-    while ((n = fread(buf, 1, sizeof(buf), fp))) if (fwrite(buf, 1, n, stdout) != n) { bad = 1; break; }
+    while (!feof(fp) && !ferror(fp)) {
+        n = fread(buf, 1, sizeof(buf), fp);
+        if (n && fwrite(buf, 1, n, stdout) != n) { bad = 1; break; }
+    }
     if (ferror(fp)) bad = 1;
     if (fclose(fp)) bad = 1;
+    if (fflush(stdout)) bad = 1;
     return bad ? -1 : 0;
 }
 

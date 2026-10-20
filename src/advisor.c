@@ -41,6 +41,24 @@ static int source_has_briefing(const char *id) {
     closedir(dir);
     return found;
 }
+static int pending_message(void) {
+    DIR *dir = opendir("messages");
+    if (!dir) return 0;
+    struct dirent *e;
+    int found = 0;
+    while ((e = readdir(dir))) {
+        unsigned long seq;
+        if (message_number(e->d_name, &seq)) continue;
+        char path[FIELD];
+        Document doc;
+        int n = snprintf(path, sizeof(path), "messages/%s", e->d_name);
+        if (n > 0 && (size_t)n < sizeof(path) && !read_document(path, &doc) &&
+            !strcmp(value(&doc, "to"), "reporter") && valid_id(value(&doc, "task")) &&
+            !source_has_briefing(value(&doc, "task"))) { found = 1; break; }
+    }
+    closedir(dir);
+    return found;
+}
 static int pending_reporter(Agency *a) {
     DIR *dir = opendir("tasks");
     if (!dir) return 0;
@@ -86,7 +104,7 @@ void suggest(Agency *a) {
         if (!source_has_message(t->id)) { printf("send analyst reporter %s \"please brief\"\n", t->id); return; }
         awaiting_reporter = 1;
     }
-    if (awaiting_reporter && pending_reporter(a)) return;
+    if ((awaiting_reporter || pending_message()) && pending_reporter(a)) return;
     if (!a->count) puts("submit tasks/task_001.task");
     else puts("No pending suggestions.");
 }

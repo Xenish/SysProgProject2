@@ -61,9 +61,8 @@ int validate_task(const Task *t) {
     char root[4096];
     if (!realpath(".", root)) return -1;
     const char *dirs[] = {"tasks/", "status/", "messages/", "logs/", "agents/", "src/", "include/"};
-    const char *relative = key;
     if (!strncmp(key, root, strlen(root)) && key[strlen(root)] == '/') {
-        relative = key + strlen(root) + 1;
+        const char *relative = key + strlen(root) + 1;
         for (size_t i = 0; i < sizeof(dirs)/sizeof(*dirs); ++i)
             if (!strncmp(relative, dirs[i], strlen(dirs[i]))) { fprintf(stderr, "Output uses reserved directory\n"); return -1; }
         if (!strncmp(relative, "reports/", 8) && strstr(relative + 8, ".report")) {
@@ -126,11 +125,13 @@ void submit_task(Agency *a, const char *path) {
         if (!fp) { perror("task publish"); return; }
         for (size_t i = 0; i < doc.count; ++i) fprintf(fp, "%s: %s\n", doc.key[i], doc.value[i]);
         if (atomic_finish(fp, canonical)) { perror("task publish"); return; }
+        t.canonical_created = true;
     }
     Task *stored = &a->tasks[a->count++];
     *stored = t;
-    char program[FIELD];
-    snprintf(program, sizeof(program), "./agents/%s", t.agent);
+    char program[FIELD + 16];
+    int program_len = snprintf(program, sizeof(program), "./agents/%s", t.agent);
+    if (program_len < 0 || (size_t)program_len >= sizeof(program)) { --a->count; return; }
     char *args[] = {program, stored->id, stored->input, stored->output, NULL};
     launch(a, stored, args);
 }
@@ -161,7 +162,8 @@ void send_message(Agency *a, const char *from, const char *to, const char *id, c
     if (!source && !task_path(path, sizeof(path), "tasks", id, "task") && !read_task(path, &pending)) source = &pending;
     if (!source || strcmp(from, source->agent)) { fprintf(stderr, "Message source task/agent mismatch\n"); return; }
     int n = snprintf(path, sizeof(path), "./agents/%s", to);
-    if (n < 0 || (size_t)n >= sizeof(path) || access(path, X_OK)) { fprintf(stderr, "Unknown recipient agent: %s\n", to); return; }
+    struct stat recipient;
+    if (n < 0 || (size_t)n >= sizeof(path) || stat(path, &recipient) || !S_ISREG(recipient.st_mode) || access(path, X_OK)) { fprintf(stderr, "Unknown recipient agent: %s\n", to); return; }
     DIR *dir = opendir("messages");
     if (!dir) { perror("messages"); return; }
     unsigned long max = 0;

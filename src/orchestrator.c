@@ -17,6 +17,7 @@ int save_status(const Task *t) {
     FILE *fp = atomic_begin(path);
     if (!fp) return -1;
     fprintf(fp, "id: %s\nagent: %s\npid: %ld\nstate: %s\ncollected: %s\n", t->id, t->agent, (long)t->pid, t->state, t->collected ? "yes" : "no");
+    fprintf(fp, "canonical_created: %s\n", t->canonical_created ? "yes" : "no");
     if (!strcmp(t->state, "done")) fprintf(fp, "exit_code: %d\nreport: reports/%s.report\n", t->exit_code, t->id);
     if (!strcmp(t->state, "error")) fprintf(fp, "message: %s\n", t->message);
     return atomic_finish(fp, path);

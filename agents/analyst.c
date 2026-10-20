@@ -15,11 +15,14 @@ int main(int argc, char **argv) {
     int code = 0;
     const char *message = "invalid CSV (expected id,score and positive integer IDs with finite scores)";
     ssize_t n = getline(&line, &capacity, fp);
-    if (n > 0) line[strcspn(line, "\r\n")] = '\0';
-    if (n <= 0 || strcmp(line, "id,score")) code = 2;
+    if (n <= 0 || n >= LINE || memchr(line, '\0', n > 0 ? (size_t)n : 0)) code = 2;
+    if (!code) {
+        while (n > 0 && (line[n - 1] == '\n' || line[n - 1] == '\r')) line[--n] = '\0';
+        if (strcmp(line, "id,score")) code = 2;
+    }
     while (!code && (n = getline(&line, &capacity, fp)) >= 0) {
         if (n >= LINE || memchr(line, '\0', (size_t)n)) { code = 2; break; }
-        line[strcspn(line, "\r\n")] = '\0';
+        while (n > 0 && (line[n - 1] == '\n' || line[n - 1] == '\r')) line[--n] = '\0';
         char *end;
         errno = 0;
         long row_id = strtol(line, &end, 10);
