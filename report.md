@@ -2,9 +2,8 @@
 
 ## 1. Student information
 
-- Name: **[STUDENT MUST FILL]**
-- Student ID: **[STUDENT MUST FILL]**
-- Second student, if applicable: **[FILL OR REMOVE]**
+- Name: **[ilker cem uluçay]**
+- Student ID: **[21120205047]**
 
 No student identity or GitHub URL has been invented. This is a local Git
 repository without a configured remote. The original professor assignment,

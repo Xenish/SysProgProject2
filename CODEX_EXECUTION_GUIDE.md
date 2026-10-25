@@ -1,7 +1,5 @@
 # Codex Execution Guide — Air-Gapped Agency
 
-Bu belge, `IMPLEMENTATION_SPEC.md` + hocanın `project2-the-air-gapped-agency.md` dokümanı ile birlikte kullanılır. Her aşamada Codex'e yalnızca ilgili prompt'u ver. Kodlamadan önce teknik kararların tamamı `IMPLEMENTATION_SPEC.md` içinde sabitlenmiştir.
-
 ## 0. İlk mesaj (Codex çalışma sözleşmesi)
 
 > Bu repoda BIL 322 Project 2: The Air-Gapped Agency geliştireceğiz. Önce `project2-the-air-gapped-agency.md` ve `IMPLEMENTATION_SPEC.md` dosyalarını tam oku. Ödevin zorunlu gereksinimlerinin önceliği var; diğer tüm belirsiz kararlarda IMPLEMENTATION_SPEC bağlayıcıdır. C11/POSIX, Makefile, -Wall -Wextra -Werror, modüler mimari, atomik tmp+rename, doğru process reaping ve durum semantiği zorunlu. Sockets/HTTP/API/LLM yok. Her faz sonunda derle/test et, sadece test edilen şeyleri başarılı say. İlgili faz dışında yeni özellik ekleme. Commit geçmişini küçük ve anlamlı tut; master/main dalına doğrudan force-push yapma. Önce iki dosya arasındaki varsa gerçek çelişkileri raporla ve dosya ağacını kısaca özetle; henüz kod yazma.
